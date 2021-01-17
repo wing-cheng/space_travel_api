@@ -45,7 +45,8 @@ def db_seed():
 
 
 
-# app routes
+############## app routes ##############
+
 @app.route('/')
 def greeting():
     return 'Welcome to Space!'
@@ -62,9 +63,12 @@ def add_ship():
         location = int(request.form['location'])
         status = request.form['status']
     except KeyError:
-        print("Something wrong with form data!")
-        return jsonify(msg='Invalid form-data.')
+        print("Something wrong with form-data!")
+        return jsonify(msg='Invalid form-data.'), 406
     
+    if not all([ship_name, model, status]):
+        return jsonify(msg="'name', 'model', 'status' cannot be null."), 406
+
     # assume that the frontend makes sure user enter a non-empty shipname, model, status
     # but does not check uniqueness
     test_ship = app.session.query(models.Spaceships).filter_by(name=ship_name).first()
@@ -73,9 +77,12 @@ def add_ship():
     
     test_location = app.session.query(models.Locations).filter_by(id=location).first()
     if not test_location:
-        return jsonify(msg=f"No such location (id: {location})."), 406
+        return jsonify(msg=f"The location (id: {location}) does not exists."), 404
     
-    # create a spaceship object
+    # if location exists, update 'stationed'
+    test_location.stationed = int(test_location.stationed) + 1
+
+    # if no problem with the data, create a spaceship object
     new = models.Spaceships(
         name=ship_name,
         model=model,
@@ -93,27 +100,46 @@ def add_ship():
 @app.route('/update_ship_status', methods=['PUT'])
 def update_ship_status():
     # assume the frontend will send the ship id and status by args
-    
-    sid = request.args.get('id')
-    status = request.args.get('status')
-    
+    try:
+        sid = request.args.get('id')
+        status = request.args.get('status')
+    except KeyError:
+        print("Something wrong with args!")
+        return jsonify(msg="Invalid arguments."), 406
+
     if not all([sid, status]):
-        raise KeyError(description="Empty value received!")
+        raise KeyError("Empty value received!")
+        return jsonify(msg="'Spaceship id' or 'status cannot be null.")
+
+    # check validity of status
+    if not valid_status(status):
+        return jsonify(msg=f"Invalid spaceship status: {status}")
 
     # check if the corresponding ship exists
     test_ship = app.session.query(models.Spaceships).filter_by(id=sid).first()
     if not test_ship:
-        return jsonify(msg="No such spaceship (id: {sid}) exists."), 404
+        return jsonify(msg=f"The spaceship (id: {sid}) does not exist."), 404
+
+    # if no problem with data
     return jsonify(msg=f"You successfully updated your spaceship '{test_ship.name}' status to '{status}'!")
 
     
 
 @app.route('/add_location', methods=["POST"])
 def add_location():
-    city_name = request.form['city_name']
-    planet_name = request.form['planet_name']
-    # assume that frontend handles empty planet name, capacity
-    capacity = request.form['capacity']
+    try:
+        city_name = request.form['city_name']
+        planet_name = request.form['planet_name']
+        capacity = request.form['capacity']
+    except KeyError:
+        print("Something wrong with form-data!")
+        return jsonify(msg='Invalid form-data.'), 406
+
+    # planet name and capacity cannot be empty
+    if not all(['planet_name', 'capacity']):
+        raise KeyError('Empty value received!')
+        return jsonify(msg="'Planet name' or 'capacity' can not be null."), 406
+
     new = models.Locations(
         city = city_name,
         planet = planet_name,
@@ -148,27 +174,55 @@ def remove_location(lid: int):
     if not rm_location:
         return jsonify(msg=f"Location (id: {lid}) not found."), 404
 
-    
-
     # delete the locatin from the db
     app.session.delete(rm_location)
     app.session.commit()
     return jsonify(msg=f"Location (id: {lid}) was successfully removed.")
 
 
+
 @app.route('/travel/<int:destination>', methods=['PUT'])
-def travel(where_start: int, destination: int):
+def travel(destination: int):
     # assume that ship id is sent through data
-    ship = request.data.get('ship_id')
+    try:
+        ship_id = int(request.args.get('id'))
+    except KeyError:
+        print("Something wrong with data!")
+        return jsonify(msg="Invalid data.")
+
+
+    # check if ship exists
+    ship_data = app.session.query(models.Spaceships).filter_by(id=ship_id).first()
+    if not ship_data:
+        return jsonify(msg=f"The spaceship (id: {ship_id}) does not exist."), 404
+
+    # check if status is right for travel
+    if not ship_data.status == 'operational':
+        return jsonify(msg=f"The spaceship (id: {ship_id}) is not in the status for travel."), 406
+
+
     # check if destination exists
-    test_location = app.session.query(models.Locations).filter_by(id=destination).first()
-    if not test_location:
-        return jsonify(msg=f"Location (id: {destination}) does not exist."), 406
+    test_destination = app.session.query(models.Locations).filter_by(id=destination).first()
+    if not test_destination:
+        return jsonify(msg=f"Destination (location id: {destination}) not found."), 404
+    
+
+    # check if destination is full in capacity
+    if int(test_destination.stationed) >= int(test_destination.capacity):
+        return jsonify(msg=f"Destination (location id: {test_destination.id}) is currently at full capacity, cannot accomodate more spaceship."), 406
+
+    # if not full in capacity, update 'stationed' of destination
+    test_destination.stationed = test_destination.stationed + 1
+
+    # update 'stationed' of origin
+    origin = app.session.query(models.Locations).filter_by(id=ship_data.location).first()
+    if origin:
+        origin.stationed = origin.stationed - 1
 
     # update location of the ship
-    app.session.query(models.Spaceships).filter_by(id=ship).update({"location": destination})
+    app.session.query(models.Spaceships).filter_by(id=ship_id).update({"location": destination})
     app.session.commit()
-    return jsonify(msg=f"You successfully travel to location (id: {destination}) with your spaceship (id: {ship})!")
+    return jsonify(msg=f"You successfully travel to location (id: {destination}) with your spaceship (id: {ship_id})!")
 
 
 if __name__ == "__main__":
