@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 
-SQLALCHEMY_DATABASE_URI = "postgres:///spaceapi"
+SQLALCHEMY_DATABASE_URI = "postgres:///spaceapi"    # chenge this
 engine = create_engine(SQLALCHEMY_DATABASE_URI)
 
 local_session = sessionmaker(
