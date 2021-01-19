@@ -11,11 +11,9 @@ CORS(app)
 app.session = scoped_session(local_session)
 
 
-# TODO
-# add exceptions
 
 
-# client commands
+############ client commands ##########
 @app.cli.command('db_create')
 def db_create():
     Base.metadata.create_all(bind=engine)
@@ -56,7 +54,7 @@ def greeting():
 @app.route('/add_ship', methods=['POST'])
 def add_ship():
 
-    # check form-data
+    # assume that frontend only receive int for 'location'
     try:
         ship_name = request.form['name']
         model = request.form['model']
@@ -66,8 +64,12 @@ def add_ship():
         print("Something wrong with form-data!")
         return jsonify(msg='Invalid form-data.'), 406
     
-    if not all([ship_name, model, status]):
-        return jsonify(msg="'name', 'model', 'status' cannot be null."), 406
+    if not location.isdigit():
+        return jsonify(msg="Please enter a number for 'location'."), 406
+
+
+    if not all([ship_name, model, status, location]):
+        return jsonify(msg="'name', 'model', 'status', 'location' cannot be null."), 406
 
     # assume that the frontend makes sure user enter a non-empty shipname, model, status
     # but does not check uniqueness
@@ -77,9 +79,13 @@ def add_ship():
     
     test_location = app.session.query(models.Locations).filter_by(id=location).first()
     if not test_location:
-        return jsonify(msg=f"The location (id: {location}) does not exists."), 404
+        return jsonify(msg=f"Location with id: {location} does not exists."), 404
     
-    # if location exists, update 'stationed'
+    # check if the capacity of 'location' is full
+    if int(test_location.stationed) >= int(test_location.capacity):
+        return jsonify(msg=f"Location (id: {location}) is full in capacity, please choose another location for your spaceship."), 403
+
+    # update 'stationed'
     test_location.stationed = int(test_location.stationed) + 1
 
     # if no problem with the data, create a spaceship object
@@ -108,17 +114,23 @@ def update_ship_status():
         return jsonify(msg="Invalid arguments."), 406
 
     if not all([sid, status]):
-        raise KeyError("Empty value received!")
-        return jsonify(msg="'Spaceship id' or 'status cannot be null.")
+        return jsonify(msg="'Spaceship id' or 'status cannot be null."), 406
 
     # check validity of status
     if not valid_status(status):
-        return jsonify(msg=f"Invalid spaceship status: {status}")
+        return jsonify(msg=f"Invalid spaceship status: {status}"), 406
 
     # check if the corresponding ship exists
     test_ship = app.session.query(models.Spaceships).filter_by(id=sid).first()
     if not test_ship:
-        return jsonify(msg=f"The spaceship (id: {sid}) does not exist."), 404
+        return jsonify(msg=f"Spaceship with id: {sid} does not exist."), 404
+
+    if test_ship.status == status:
+        return jsonify(msg=f"Spaceship (id: {sid}) is in status '{status}' already"), 406
+
+    # update the status
+    test_ship.status = status
+    app.session.commit()
 
     # if no problem with data
     return jsonify(msg=f"You successfully updated your spaceship '{test_ship.name}' status to '{status}'!")
@@ -137,8 +149,12 @@ def add_location():
 
     # planet name and capacity cannot be empty
     if not all(['planet_name', 'capacity']):
-        raise KeyError('Empty value received!')
-        return jsonify(msg="'Planet name' or 'capacity' can not be null."), 406
+        return jsonify(msg="'planet_406name' or 'capacity' can not be null."), 406
+
+    # check if there already exists planet with the same planet and city name
+    test_same_name = app.session.query(models.Locations).filter_by(city_name=city_name, planet_name=planet_name).first()
+    if test_same_name:
+        return jsonify(msg=f"Location '{planet_name} {city_name}' already exists, please register with another name"), 406
 
     new = models.Locations(
         city = city_name,
@@ -158,8 +174,11 @@ def remove_ship(sid: int):
     rm_ship = app.session.query(models.Spaceships).filter_by(id=sid).first()
     # if not exist, tell the user that ship not in the system
     if not rm_ship:
-        return jsonify(msg=f"Spaceship (id: {sid}) not found."), 404
+        return jsonify(msg=f"Spaceship with id: {sid} not found."), 404
     
+    # decrease 'stationed' of the location at which the spaceship is at
+    rm_ship.where.stationed = rm_ship.where.stationed - 1
+
     app.session.delete(rm_ship)
     app.session.commit()
     return jsonify(msg=f"Spaceship (id: {sid}) was successfully removed.")
@@ -168,11 +187,16 @@ def remove_ship(sid: int):
 
 @app.route('/remove_location/<int:lid>', methods=['DELETE'])
 def remove_location(lid: int):
+
     # retireve the db model object from daatabase
     rm_location = app.session.query(models.Locations).filter_by(id=lid).first()
     # if not exist, tell the user that location is not in the system
     if not rm_location:
-        return jsonify(msg=f"Location (id: {lid}) not found."), 404
+        return jsonify(msg=f"Location with id: {lid} not found."), 404
+
+    # cannot remove the location if there is a spaceship
+    if rm_location.stationed != 0:
+        return jsonify(msg=f"Spaceship present, location (id: {lid}) cannot be removed."), 403
 
     # delete the locatin from the db
     app.session.delete(rm_location)
@@ -194,12 +218,15 @@ def travel(destination: int):
     # check if ship exists
     ship_data = app.session.query(models.Spaceships).filter_by(id=ship_id).first()
     if not ship_data:
-        return jsonify(msg=f"The spaceship (id: {ship_id}) does not exist."), 404
+        return jsonify(msg=f"Spaceship with id: {ship_id} does not exist."), 404
 
     # check if status is right for travel
-    if not ship_data.status == 'operational':
-        return jsonify(msg=f"The spaceship (id: {ship_id}) is not in the status for travel."), 406
+    if ship_data.status != 'operational':
+        return jsonify(msg=f"Spaceship (id: {ship_id}) is not in the status for travel."), 403
 
+    # if the spaceship is already at the destination
+    if ship_data.location == destination:
+        return jsonify(msg=f"Spaceship (id: {ship_id}) is already at destination (id: {destination})."), 406
 
     # check if destination exists
     test_destination = app.session.query(models.Locations).filter_by(id=destination).first()
@@ -209,7 +236,7 @@ def travel(destination: int):
 
     # check if destination is full in capacity
     if int(test_destination.stationed) >= int(test_destination.capacity):
-        return jsonify(msg=f"Destination (location id: {test_destination.id}) is currently at full capacity, cannot accomodate more spaceship."), 406
+        return jsonify(msg=f"Destination (location id: {test_destination.id}) is currently at full capacity, cannot accomodate more spaceship."), 403
 
     # if not full in capacity, update 'stationed' of destination
     test_destination.stationed = test_destination.stationed + 1
@@ -220,15 +247,17 @@ def travel(destination: int):
         origin.stationed = origin.stationed - 1
 
     # update location of the ship
-    app.session.query(models.Spaceships).filter_by(id=ship_id).update({"location": destination})
+    ship_data.location = destination
     app.session.commit()
-    return jsonify(msg=f"You successfully travel to location (id: {destination}) with your spaceship (id: {ship_id})!")
+    return jsonify(msg=f"Spaceship (id: {ship_id}) traveled to location (id: {destination}) successfully!")
 
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
 
 
-# helper functions
+
+############ helper functions ############
+
 def valid_status(s: str) -> bool:
     return s in ['decommissioned', 'maintenance', 'operational']
