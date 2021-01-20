@@ -139,6 +139,7 @@ def update_ship_status():
 
 @app.route('/add_location', methods=["POST"])
 def add_location():
+    # assume that Front-end will not accept any empty value for the parameters
     try:
         city_name = request.form['city_name']
         planet_name = request.form['planet_name']
@@ -207,7 +208,7 @@ def remove_location(lid: int):
 
 @app.route('/travel/<int:destination>', methods=['PUT'])
 def travel(destination: int):
-    # assume that ship id is sent through data
+    # assume that ship_id is sent through arguements
     try:
         ship_id = int(request.args.get('id'))
     except KeyError:
