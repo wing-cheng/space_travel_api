@@ -52,7 +52,7 @@
 | /update_ship_status          | sid (int), status (str)                                      | Front-end sends the parameters to back-end through arguments |
 | /add_location                | city_name (str, nullable), planet_name (str), capacity (int) | Front-end will not accept any empty value for the parameters except for *city_name* |
 | /remove_location/\<int:lid\> | lid (int)                                                    | None                                                         |
-| /travel/\<int:destination\>  | destination (int), ship_id (int)                             | Front-end sends *ship_id* through arguments                  |
+| /travel/\<int:destination\>  | destination (int), ship_id (int)                             | Front-end sends *ship_id* through arguments; it only accept integer for *ship_id* |
 
 
 
