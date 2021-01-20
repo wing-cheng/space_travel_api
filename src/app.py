@@ -209,6 +209,7 @@ def remove_location(lid: int):
 @app.route('/travel/<int:destination>', methods=['PUT'])
 def travel(destination: int):
     # assume that ship_id is sent through arguements
+    # assume that front-end only accepts integer for ship_id
     try:
         ship_id = int(request.args.get('id'))
     except KeyError:
