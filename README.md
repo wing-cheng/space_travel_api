@@ -1,4 +1,6 @@
-## Assumptions
+## Space API
+
+
 
 ### Database models
 
@@ -14,8 +16,6 @@
 
 
 
-
-
 #### Locations
 
 | column name | data type | note                                                         |
@@ -26,18 +26,38 @@
 | capacity    | integer   | must be equal or greater than 0, user must supply when adding a new location |
 | stationed   | integer   | must be greater or equal than 0, must be less or equal than *capacity*; updated when a spaceship travels; equals to 0 when first added |
 
-**Comment** all *id*s  uniquely identify a data entry for its entire existence, Even if the entry is removed, the *id* cannot be reused for any new entry.
+**Comment** : all *id*s  uniquely identify a data entry for its entire existence, Even if the entry is removed, the *id* cannot be reused for any new entry.
 
 
 
 ### API Routes
 
-| HTTP route                   | HTTP method | Given                                                        | Returned HTTP code                                           | Description                                                  |
+| HTTP route                   | HTTP method | Parameters                                                   | Returned HTTP code                                           | Description                                                  |
 | ---------------------------- | ----------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| /add_ship                    | POST        | ship_name (str), model (str), location (int), status (str)   | **406** if given empty value for required data; **406** if *ship_name* is used;  **404** is *location* does not exist; **403** if *location* is full in capacity | Given the data of a new spaceship, add a new row into the database and return a message indicating successful registration |
-| /remove_ship/\<int:sid\>     | DELETE      | ship_id (int)                                                | **404** if the ship with *ship_id* not found in the database | Remove a row from the database, update the number of spaceship at the location the spaceship was previously and return a message indicating successful removal |
-| /update_ship_status          | PUT         | ship_id (int), status (str)                                  | **406** if given invalid data; **404** if spaceship with given *ship_id* not found in database; **406** if the spaceship is in *status* already | Update the 'status' column of entry with the given *ship_id*, return a message indicating successful update |
+| /add_ship                    | POST        | ship_name (str), model (str), location (int), status (str)   | **406** if given empty value for required data; **406** if *ship_name* is used;  **404** if *location* does not exist; **403** if *location* is full in capacity | Given the data of a new spaceship, add a new row into the database and return a message indicating successful registration |
+| /remove_ship/\<int:sid\>     | DELETE      | sid (int)                                                    | **404** if the ship with *sid* not found in the database     | Remove a row from the database, update the number of spaceship at the location the spaceship was previously and return a message indicating successful removal |
+| /update_ship_status          | PUT         | sid (int), status (str)                                      | **406** if given invalid data; **404** if spaceship with given *ship_id* not found in database; **406** if the spaceship is in *status* already | Update the 'status' column of entry with the given *ship_id*, return a message indicating successful update |
 | /add_location                | POST        | city_name (str, nullable), planet_name (str), capacity (int) | **406** if receive invalid data; **406** if a location with the same *city_name* and *planet_name* already exists in the database | Add a spaceship data entry with the given data to the database and return a message indicating successful registration |
-| /remove_location/\<int:lid\> | DELETE      | location_id (int)                                            | **404** if location with given *location_id* not found in the database; **403** if there are spaceship at the location needed to be removed | Delete a location data entry with given *location_id* from the database, return a message indicating successful removal |
-| /travel/\<int:destination\>  | PUT         | destination_id (int), ship_id (int)                          | **404** if location with *destination_id*  or location with *destination_id* not found in the database; **403** if spaceship with *ship_id* is not in 'operational' status; **406** if spaceship with *ship_id* is already at *destination_id*; **403** if *destination* cannot accommodate any more spaceship | Update the 'location' column of the spaceship entry with *ship_id*, update 'stationed' column of *destination* and *origin*, return a message indicating successful update |
+| /remove_location/\<int:lid\> | DELETE      | lid (int)                                                    | **404** if location with given *lid* not found in the database; **403** if there are spaceship at the location needed to be removed | Delete a location data entry with given *location_id* from the database, return a message indicating successful removal |
+| /travel/\<int:destination\>  | PUT         | destination (int), ship_id (int)                             | **404** if location with *destination* id not found in the database; **403** if spaceship with *ship_id* is not in 'operational' status; **406** if spaceship with *ship_id* is already at destination; **403** if destination cannot accommodate any more spaceship | Update the 'location' column of the spaceship entry with *ship_id*, update 'stationed' column of *destination* and *origin*, return a message indicating successful update |
 
+
+
+### Assumptions on Front-end
+
+| HTTP routes                  | Parameters                                                   | Assumptions                                                  |
+| ---------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| /add_ship                    | ship_name (str), model (str), location (int), status (str)   | Front-end only receives integer for *location*; Front-end will not accept empty value for any parameter |
+| /remove_ship/\<int:sid>      | sid (int)                                                    | None                                                         |
+| /update_ship_status          | sid (int), status (str)                                      | Front-end sends the parameters to back-end through arguments |
+| /add_location                | city_name (str, nullable), planet_name (str), capacity (int) | Front-end will not accept any empty value for the parameters except for *city_name* |
+| /remove_location/\<int:lid\> | lid (int)                                                    | None                                                         |
+| /travel/\<int:destination\>  | destination (int), ship_id (int)                             | Front-end sends *ship_id* through arguments                  |
+
+
+
+### Other Comments
+
+#### Why `SQLAlchemy` instead of `flask-sqlalchemy`?
+
+The biggest weakness of `flask-sqlalchemy` is that it makes using the database outside of a `Flask` context difficult. This is since that the database connection, models, app are all placed in a single `app.py` file, which restricts the interaction with database outside of the app. Also, if we are to place database connection, models and app in separate files (which is a more secure way than putting them all in a single file), `flask-sqlalchemy` makes it difficult to do so.

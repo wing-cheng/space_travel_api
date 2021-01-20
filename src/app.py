@@ -105,7 +105,7 @@ def add_ship():
 
 @app.route('/update_ship_status', methods=['PUT'])
 def update_ship_status():
-    # assume the frontend will send the ship id and status by args
+    # assume that Front-end sends the parameters to back-end through arguments
     try:
         sid = request.args.get('id')
         status = request.args.get('status')
