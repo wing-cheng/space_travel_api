@@ -60,11 +60,11 @@ def add_ship():
         model = request.form['model']
         location = int(request.form['location'])
         status = request.form['status']
-    except KeyError:
+    except (KeyError, ValueError):
         print("Something wrong with form-data!")
         return jsonify(msg='Invalid form-data.'), 406
     
-    if not location.isdigit():
+    if not isinstance(location, int) :
         return jsonify(msg="Please enter a number for 'location'."), 406
 
 
@@ -107,9 +107,9 @@ def add_ship():
 def update_ship_status():
     # assume that Front-end sends the parameters to back-end through arguments
     try:
-        sid = request.args.get('id')
+        sid = int(request.args.get('id'))
         status = request.args.get('status')
-    except KeyError:
+    except (KeyError, ValueError):
         print("Something wrong with args!")
         return jsonify(msg="Invalid arguments."), 406
 
@@ -143,8 +143,8 @@ def add_location():
     try:
         city_name = request.form['city_name']
         planet_name = request.form['planet_name']
-        capacity = request.form['capacity']
-    except KeyError:
+        capacity = int(request.form['capacity'])
+    except (KeyError, ValueError):
         print("Something wrong with form-data!")
         return jsonify(msg='Invalid form-data.'), 406
 
@@ -153,7 +153,7 @@ def add_location():
         return jsonify(msg="'planet_406name' or 'capacity' can not be null."), 406
 
     # check if there already exists planet with the same planet and city name
-    test_same_name = app.session.query(models.Locations).filter_by(city_name=city_name, planet_name=planet_name).first()
+    test_same_name = app.session.query(models.Locations).filter_by(city=city_name, planet=planet_name).first()
     if test_same_name:
         return jsonify(msg=f"Location '{planet_name} {city_name}' already exists, please register with another name"), 406
 
@@ -212,9 +212,9 @@ def travel(destination: int):
     # assume that front-end only accepts integer for ship_id
     try:
         ship_id = int(request.args.get('id'))
-    except KeyError:
+    except (KeyError, ValueError):
         print("Something wrong with data!")
-        return jsonify(msg="Invalid data.")
+        return jsonify(msg="Invalid data."), 406
 
 
     # check if ship exists
@@ -255,7 +255,7 @@ def travel(destination: int):
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=True, host='0.0.0.0')
 
 
 
