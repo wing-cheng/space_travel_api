@@ -42,6 +42,13 @@ def db_seed():
 
 
 
+############ helper functions ############
+
+def valid_status(s: str) -> bool:
+    return s in ['decommissioned', 'maintenance', 'operational']
+
+
+
 
 ############## app routes ##############
 
@@ -126,7 +133,7 @@ def update_ship_status():
         return jsonify(msg=f"Spaceship with id: {sid} does not exist."), 404
 
     if test_ship.status == status:
-        return jsonify(msg=f"Spaceship (id: {sid}) is in status '{status}' already"), 406
+        return jsonify(msg=f"Spaceship (id: {sid}) is already in status '{status}'"), 406
 
     # update the status
     test_ship.status = status
@@ -197,7 +204,7 @@ def remove_location(lid: int):
 
     # cannot remove the location if there is a spaceship
     if rm_location.stationed != 0:
-        return jsonify(msg=f"Spaceship present, location (id: {lid}) cannot be removed."), 403
+        return jsonify(msg=f"Spaceships present, location (id: {lid}) cannot be removed."), 403
 
     # delete the locatin from the db
     app.session.delete(rm_location)
@@ -256,10 +263,3 @@ def travel(destination: int):
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True, host='0.0.0.0')
-
-
-
-############ helper functions ############
-
-def valid_status(s: str) -> bool:
-    return s in ['decommissioned', 'maintenance', 'operational']
