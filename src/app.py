@@ -70,9 +70,6 @@ def add_ship():
     except (KeyError, ValueError):
         print("Something wrong with form-data!")
         return jsonify(msg='Invalid form-data.'), 406
-    
-    if not isinstance(location, int) :
-        return jsonify(msg="Please enter a number for 'location'."), 406
 
 
     if not all([ship_name, model, status, location]):
